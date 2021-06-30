@@ -1932,6 +1932,14 @@ func (l *channelLink) handleUpstreamMsg(msg lnwire.Message) {
 			"ChannelPoint(%v): received error from peer: %v",
 			l.channel.ChannelPoint(), msg.Error(),
 		)
+	case *lnwire.ChannelUpdate:
+		l.log.Errorf("ChannelUpdate", l.isDisabled(), l.EligibleToForward())
+		isDisabled := msg.ChannelFlags&lnwire.ChanUpdateDisabled != 0
+		if l.isDisabled() != isDisabled {
+			l.setDisabled(isDisabled)
+		}
+		l.log.Errorf("ChannelUpdate after", l.isDisabled(), l.EligibleToForward())
+
 	default:
 		l.log.Warnf("received unknown message of type %T", msg)
 	}
