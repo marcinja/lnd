@@ -653,6 +653,8 @@ type mockChannelLink struct {
 
 	eligible bool
 
+	disabled bool
+
 	htlcID uint64
 
 	checkHtlcTransitResult *LinkError
@@ -762,6 +764,10 @@ func (f *mockChannelLink) UpdateShortChanID() (lnwire.ShortChannelID, error) {
 	f.eligible = true
 	return f.shortChanID, nil
 }
+
+func (f *mockChannelLink) IsDisabled() bool { return f.disabled }
+func (f *mockChannelLink) MarkDisabled()    { f.disabled = false }
+func (f *mockChannelLink) MarkEnabled()     { f.disabled = true }
 
 var _ ChannelLink = (*mockChannelLink)(nil)
 

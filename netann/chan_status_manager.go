@@ -52,6 +52,14 @@ type ChanStatusConfig struct {
 	// FundingLocked, and the remote peer is online.
 	IsChannelActive func(lnwire.ChannelID) bool
 
+	// MarkChannelLinkDisabled makes sure the ChannelLink corresponding to this
+	// ChannelID is disabled and stops forwarding HTLCs.
+	MarkChannelLinkDisabled func(lnwire.ChannelID) error
+
+	// MarkChannelLinkEnabled makes sure the ChannelLink corresponding to this
+	// ChannelID is enabled and starts forwarding HTLCs again.
+	MarkChannelLinkEnabled func(lnwire.ChannelID) error
+
 	// ApplyChannelUpdate processes new ChannelUpdates signed by our node by
 	// updating our local routing table and broadcasting the update to our
 	// peers.
@@ -413,6 +421,10 @@ func (m *ChanStatusManager) processEnableRequest(outpoint wire.OutPoint,
 	}
 
 	m.chanStates.markEnabled(outpoint)
+	err = m.cfg.MarkChannelLinkEnabled(chanID)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -455,6 +467,12 @@ func (m *ChanStatusManager) processDisableRequest(outpoint wire.OutPoint,
 		m.chanStates.markManuallyDisabled(outpoint)
 	} else if status != ChanStatusManuallyDisabled {
 		delete(m.chanStates, outpoint)
+	}
+
+	chanID := lnwire.NewChanIDFromOutPoint(&outpoint)
+	err = m.cfg.MarkChannelLinkDisabled(chanID)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -577,6 +595,12 @@ func (m *ChanStatusManager) disableInactiveChannels() {
 
 		// Record that the channel has now been disabled.
 		m.chanStates.markDisabled(outpoint)
+
+		chanID := lnwire.NewChanIDFromOutPoint(&outpoint)
+		err = m.cfg.MarkChannelLinkDisabled(chanID)
+		if err != nil {
+			log.Errorf("Unable to mark ChannelLink(%v) as disabled: %v", outpoint, err)
+		}
 	}
 }
 

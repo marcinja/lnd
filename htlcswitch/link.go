@@ -571,17 +571,20 @@ func (l *channelLink) EligibleToForward() bool {
 		l.isReestablished()
 }
 
-// isDisabled returns true if the channel has been diabled
-func (l *channelLink) isDisabled() bool {
+// IsDisabled returns true if the channel has been diabled
+func (l *channelLink) IsDisabled() bool {
 	return atomic.LoadInt32(&l.channelDisabled) == 1
 }
 
-func (l *channelLink) setDisabled(disabled bool) {
-	if disabled {
-		atomic.StoreInt32(&l.channelDisabled, 1)
-	} else {
-		atomic.StoreInt32(&l.channelDisabled, 0)
-	}
+// MarkDisabled marks the channel as disabled so as to prevent accepting new
+// HTLCs.
+func (l *channelLink) MarkDisabled() {
+	atomic.StoreInt32(&l.channelDisabled, 1)
+}
+
+// MarkEnabled marks the channel as enabled, allowing it to accept enw HTLCs.
+func (l *channelLink) MarkEnabled() {
+	atomic.StoreInt32(&l.channelDisabled, 0)
 }
 
 // isReestablished returns true if the link has successfully completed the
@@ -1318,6 +1321,14 @@ func (l *channelLink) handleDownstreamUpdateAdd(pkt *htlcPacket) error {
 		return errors.New("not an UpdateAddHTLC packet")
 	}
 
+	if l.IsDisabled() {
+		l.mailBox.FailAdd(pkt)
+		return NewDetailedLinkError(
+			&lnwire.FailChannelDisabled{},
+			OutgoingFailureForwardsDisabled,
+		)
+	}
+
 	// If hodl.AddOutgoing mode is active, we exit early to simulate
 	// arbitrary delays between the switch adding an ADD to the
 	// mailbox, and the HTLC being added to the commitment state.
@@ -1627,9 +1638,27 @@ func (l *channelLink) cleanupSpuriousResponse(pkt *htlcPacket) {
 // updates from the upstream peer. The upstream peer is the peer whom we have a
 // direct channel with, updating our respective commitment chains.
 func (l *channelLink) handleUpstreamMsg(msg lnwire.Message) {
+	l.log.Warnf("message of type %T", msg)
 	switch msg := msg.(type) {
 
 	case *lnwire.UpdateAddHTLC:
+		if l.IsDisabled() {
+			/*
+			   failure := NewDetailedLinkError(
+			     &lnwire.FailChannelDisabled{},
+			     OutgoingFailureForwardsDisabled,
+			   )
+			   // TODO: obfuscate?
+			   l.cfg.Peer.SendMessage(false, &lnwire.Error{
+			     ChanID: l.ChanID(),
+			     Data: failure.WireMessage(),
+			   })
+			*/
+
+			l.fail(LinkFailureError{code: ErrRemoteError}, "channel disabled, unable to add HTLC")
+			return
+		}
+
 		// We just received an add request from an upstream peer, so we
 		// add it to our state machine, then add the HTLC to our
 		// "settle" list in the event that we know the preimage.
@@ -2220,6 +2249,8 @@ func (l *channelLink) CheckHtlcForward(payHash [32]byte,
 	incomingHtlcAmt, amtToForward lnwire.MilliSatoshi,
 	incomingTimeout, outgoingTimeout uint32,
 	heightNow uint32) *LinkError {
+
+	//TODO: error here if channel is disabled
 
 	l.RLock()
 	policy := l.cfg.FwrdingPolicy

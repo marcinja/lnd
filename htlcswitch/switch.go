@@ -757,6 +757,11 @@ func (s *Switch) getLocalLink(pkt *htlcPacket, htlc *lnwire.UpdateAddHTLC) (
 		return nil, NewLinkError(&lnwire.FailUnknownNextPeer{})
 	}
 
+	if link.IsDisabled() {
+		log.Errorf("Link %v is disabled and not available to forward", pkt.outgoingChanID)
+		return nil, NewDetailedLinkError(&lnwire.FailChannelDisabled{}, OutgoingFailureForwardsDisabled)
+	}
+
 	if !link.EligibleToForward() {
 		log.Errorf("Link %v is not available to forward",
 			pkt.outgoingChanID)
@@ -1038,6 +1043,8 @@ func (s *Switch) handlePacketForward(packet *htlcPacket) error {
 					&lnwire.FailUnknownNextPeer{},
 					OutgoingFailureLinkNotEligible,
 				)
+			} else if link.IsDisabled() {
+				failure = NewDetailedLinkError(&lnwire.FailChannelDisabled{}, OutgoingFailureForwardsDisabled)
 			} else {
 				// We'll ensure that the HTLC satisfies the
 				// current forwarding conditions of this target
@@ -2066,6 +2073,30 @@ func (s *Switch) HasActiveLink(chanID lnwire.ChannelID) bool {
 	}
 
 	return false
+}
+
+// MarkChannelLinkDisabled marks the channel as disabled so as to prevent accepting new
+// HTLCs. It is called from the ChanStatusManager.
+func (s *Switch) MarkChannelLinkDisabled(chanID lnwire.ChannelID) error {
+	link, err := s.getLink(chanID)
+	if err != nil {
+		return err
+	}
+
+	link.MarkDisabled()
+	return nil
+}
+
+// MarkChannelLinkEnabled marks the channel as enabled, allowing it to accept
+// enw HTLCs. It is called from the ChanStatusManager.
+func (s *Switch) MarkChannelLinkEnabled(chanID lnwire.ChannelID) error {
+	link, err := s.getLink(chanID)
+	if err != nil {
+		return err
+	}
+
+	link.MarkEnabled()
+	return nil
 }
 
 // RemoveLink purges the switch of any link associated with chanID. If a pending

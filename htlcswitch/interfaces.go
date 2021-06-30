@@ -153,6 +153,17 @@ type ChannelLink interface {
 	// have buffered messages.
 	AttachMailBox(MailBox)
 
+	// MarkDisabled marks the channel as disabled so as to prevent accepting new
+	// HTLCs.
+	MarkDisabled()
+
+	// MarkDisabled marks the channel as enabled, allowing it to accept enw HTLCs.
+	MarkEnabled()
+
+	// IsDisabled returns a bool indicating whether or not the channel is
+	// disabled.
+	IsDisabled() bool
+
 	// Start/Stop are used to initiate the start/stop of the channel link
 	// functioning.
 	Start() error
