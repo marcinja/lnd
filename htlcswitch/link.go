@@ -1961,13 +1961,6 @@ func (l *channelLink) handleUpstreamMsg(msg lnwire.Message) {
 			"ChannelPoint(%v): received error from peer: %v",
 			l.channel.ChannelPoint(), msg.Error(),
 		)
-	case *lnwire.ChannelUpdate:
-		l.log.Errorf("ChannelUpdate", l.isDisabled(), l.EligibleToForward())
-		isDisabled := msg.ChannelFlags&lnwire.ChanUpdateDisabled != 0
-		if l.isDisabled() != isDisabled {
-			l.setDisabled(isDisabled)
-		}
-		l.log.Errorf("ChannelUpdate after", l.isDisabled(), l.EligibleToForward())
 
 	default:
 		l.log.Warnf("received unknown message of type %T", msg)
@@ -2340,6 +2333,8 @@ func (l *channelLink) CheckHtlcTransit(payHash [32]byte,
 func (l *channelLink) canSendHtlc(policy ForwardingPolicy,
 	payHash [32]byte, amt lnwire.MilliSatoshi, timeout uint32,
 	heightNow uint32) *LinkError {
+
+	// TODO: add check
 
 	// As our first sanity check, we'll ensure that the passed HTLC isn't
 	// too small for the next hop. If so, then we'll cancel the HTLC

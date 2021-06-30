@@ -2078,6 +2078,9 @@ func (s *Switch) HasActiveLink(chanID lnwire.ChannelID) bool {
 // MarkChannelLinkDisabled marks the channel as disabled so as to prevent accepting new
 // HTLCs. It is called from the ChanStatusManager.
 func (s *Switch) MarkChannelLinkDisabled(chanID lnwire.ChannelID) error {
+	s.indexMtx.Lock()
+	defer s.indexMtx.Unlock()
+
 	link, err := s.getLink(chanID)
 	if err != nil {
 		return err
@@ -2090,6 +2093,9 @@ func (s *Switch) MarkChannelLinkDisabled(chanID lnwire.ChannelID) error {
 // MarkChannelLinkEnabled marks the channel as enabled, allowing it to accept
 // enw HTLCs. It is called from the ChanStatusManager.
 func (s *Switch) MarkChannelLinkEnabled(chanID lnwire.ChannelID) error {
+	s.indexMtx.Lock()
+	defer s.indexMtx.Unlock()
+
 	link, err := s.getLink(chanID)
 	if err != nil {
 		return err
