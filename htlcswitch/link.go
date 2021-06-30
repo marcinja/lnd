@@ -305,9 +305,10 @@ type localUpdateAddMsg struct {
 // message ordering and updates.
 type channelLink struct {
 	// The following fields are only meant to be used *atomically*
-	started       int32
-	reestablished int32
-	shutdown      int32
+	started         int32
+	reestablished   int32
+	shutdown        int32
+	channelDisabled int32
 
 	// failed should be set to true in case a link error happens, making
 	// sure we don't process any more updates.
@@ -568,6 +569,19 @@ func (l *channelLink) EligibleToForward() bool {
 	return l.channel.RemoteNextRevocation() != nil &&
 		l.ShortChanID() != hop.Source &&
 		l.isReestablished()
+}
+
+// isDisabled returns true if the channel has been diabled
+func (l *channelLink) isDisabled() bool {
+	return atomic.LoadInt32(&l.channelDisabled) == 1
+}
+
+func (l *channelLink) setDisabled(disabled bool) {
+	if disabled {
+		atomic.StoreInt32(&l.channelDisabled, 1)
+	} else {
+		atomic.StoreInt32(&l.channelDisabled, 0)
+	}
 }
 
 // isReestablished returns true if the link has successfully completed the
